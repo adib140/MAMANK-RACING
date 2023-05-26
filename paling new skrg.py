@@ -80,6 +80,10 @@ class Player(pygame.sprite.Sprite):
                 self.rect.move_ip(self.speed, 0)
             if key[pygame.K_LEFT] and self.rect.left > 100:
                 self.rect.move_ip(-self.speed, 0)
+            if key[pygame.K_UP] and self.rect.top > 100:
+                self.rect.move_ip(0, -self.speed)
+            if key[pygame.K_DOWN] and self.rect.bottom > 150:
+                self.rect.move_ip(0, self.speed)
         else:
              # Logika pergerakan player saat efek slippery aktif
             self.slide_counter += 1
