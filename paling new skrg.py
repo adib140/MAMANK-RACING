@@ -1,9 +1,4 @@
-from ast import With
-from asyncio import current_task
-from glob import iglob
-from importlib.util import set_loader
-from lib2to3.pytree import convert
-from turtle import update
+from abc import ABC, abstractmethod
 import pygame
 import random
 import os
@@ -61,81 +56,76 @@ pygame.display.set_caption('Car Racing')
 clock = pygame.time.Clock()
 player_speed = 4
 
-class Player(pygame.sprite.Sprite):
-    def __init__(self, x, y, car):
+class GameObject(ABC, pygame.sprite.Sprite):
+    def __init__(self, x, y, image):
         super().__init__()
-        self.image = pygame.image.load(os.path.join(car_folder, car)).convert_alpha()
+        self.image = image
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
-        self.speed = player_speed
-        self.slippery = False
-        self.slide_direction = 0  # Menyimpan arah pergerakan saat efek slippery aktif
-        self.slide_counter = 0 
-        self.slide_duration = 30
+        self.hit = False
+    
+    @abstractmethod
+    def update(self):
+        pass
+
+class Player(GameObject):
+    def __init__(self, x, y, car):
+        super().__init__(x, y, car)
+        self.__speed = player_speed
+        self.__slippery = False
+        self.__slide_direction = 0
+        self.__slide_counter = 0 
+        self.__slide_duration = 30
     def update(self):
         key = pygame.key.get_pressed()
-        if not self.slippery :
+        if not self.__slippery :
             if key[pygame.K_RIGHT] and self.rect.right < 680:
-                self.rect.move_ip(self.speed, 0)
+                self.rect.move_ip(self.__speed, 0)
             if key[pygame.K_LEFT] and self.rect.left > 100:
-                self.rect.move_ip(-self.speed, 0)
+                self.rect.move_ip(-self.__speed, 0)
             if key[pygame.K_DOWN] and self.rect.bottom < BACKGROUND_HEIGHT:
-                self.rect.move_ip(0, self.speed)
+                self.rect.move_ip(0, self.__speed)
             if key[pygame.K_UP] and self.rect.top > 0:
-                self.rect.move_ip(0, -self.speed)
+                self.rect.move_ip(0, -self.__speed)
         else:
              # Logika pergerakan player saat efek slippery aktif
-            self.slide_counter += 1
-            if self.slide_counter >= 1 and self.slide_counter <= self.slide_duration:
+            self.__slide_counter += 1
+            if self.__slide_counter >= 1 and self.__slide_counter <= self.__slide_duration:
                 if self.slide_counter % 10 == 0:
                     # Setiap 10 frame, ubah arah pergerakan secara acak
-                    self.slide_direction = random.choice([-1, 1])
-                self.rect.move_ip(self.speed * self.slide_direction, 0)
+                    self.__slide_direction = random.choice([-1, 1])
+                self.rect.move_ip(self.__speed * self.__slide_direction, 0)
             else:
                 # Menghentikan efek slippery setelah durasi tertentu
-                self.slide_counter = 0
-                self.slide_direction = 0
-                self.slippery = False
+                self.__slide_counter = 0
+                self.__slide_direction = 0
+                self.__slippery = False
+            if self.slippery and not self.slide_direction == 0:
+                self.__speed = 2  # Mengurangi kecepatan saat efek slippery aktif
+            else:
+                self.__speed = player_speed
+    
 
-        if self.slippery and not self.slide_direction == 0:
-            self.speed = 2  # Mengurangi kecepatan saat efek slippery aktif
-        else:
-            self.speed = player_speed
-
-class Pohon(pygame.sprite.Sprite):
+class Pohon(GameObject):
     def __init__(self, x, img):
-        super().__init__()
-        self.image = img
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = -50
-        self.hit = False
+        super().__init__(x, -50, img)
 
     def update(self):
         if self.rect.y > BACKGROUND_HEIGHT:
             self.kill()
 
-class PanahJalan(pygame.sprite.Sprite):
+class PanahJalan(GameObject):
     def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.transform.scale(pygame.image.load(os.path.join(object_folder, "arrow_white.png")).convert_alpha(), (100, 50))
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
+        super().__init__(x,y, image = pygame.transform.scale(pygame.image.load(os.path.join(object_folder, "arrow_white.png")).convert_alpha(), (100, 50)))
 
     def update(self):
         if self.rect.y > BACKGROUND_HEIGHT:
             self.kill()
 
-class CarLeft(pygame.sprite.Sprite):
+class CarLeft(GameObject):
     def __init__(self, x, img):
-        super().__init__()
-        self.image = pygame.transform.rotate(img, 180)
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = -250
-        self.hit = False
+        super().__init__(x, -250, pygame.transform.rotate(img, 180))
         
     def update(self):
         if self.rect.y > BACKGROUND_HEIGHT:
@@ -143,14 +133,9 @@ class CarLeft(pygame.sprite.Sprite):
         else:
             self.rect.y += random.randint(1, 3)
 
-class CarRight(pygame.sprite.Sprite):
+class CarRight(GameObject):
     def __init__(self, x, img):
-        super().__init__()
-        self.image = img
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = BACKGROUND_HEIGHT+100
-        self.hit = False
+        super().__init__(x, BACKGROUND_HEIGHT + 100, img)
         
     def update(self):
         if self.rect.y < -150:
@@ -159,27 +144,17 @@ class CarRight(pygame.sprite.Sprite):
             self.rect.y -= random.randint(1, 3)
 
 
-class Oli(pygame.sprite.Sprite):
+class Oli(GameObject):
     def __init__(self, x, img):
-        super().__init__()
-        self.image = img
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = -50
-        self.hit = False
+        super().__init__(x, -50, img)
 
     def update(self):
         if self.rect.y > BACKGROUND_HEIGHT:
             self.kill()
 
-class Bensin(pygame.sprite.Sprite):
+class Bensin(GameObject):
     def __init__(self, x, img):
-        super().__init__()
-        self.image = img
-        self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = -50
-        self.hit = False
+        super().__init__(x, -50, img)
 
     def update(self):
         if self.rect.y > BACKGROUND_HEIGHT:
@@ -259,8 +234,8 @@ scene = {
     2: "GAME OVER",
 }
 
-
-player = Player(BACKGROUND_WIDTH // 2 - 30, BACKGROUND_HEIGHT/2-50, f"car_{current_car}.png")
+player_car = pygame.image.load(os.path.join(car_folder, f"car_{current_car}.png")).convert_alpha()
+player = Player(BACKGROUND_WIDTH // 2 - 30, BACKGROUND_HEIGHT/2-50, player_car)
 all_sprites.add(player)
 current_scene = 0
 pygame.mixer.music.load("sound/backsound.mp3")  # Load file musik
@@ -296,7 +271,9 @@ while run:
                     panah = PanahJalan(BACKGROUND_WIDTH//2 -50, i * 230 + 40)
                     panahGrup.add(panah)
 
-                player = Player(BACKGROUND_WIDTH // 2 - 30, BACKGROUND_HEIGHT / 2 - 50,f"car_{current_car}.png")
+                player_car = pygame.image.load(os.path.join(car_folder, f"car_{current_car}.png")).convert_alpha()
+                player = Player(BACKGROUND_WIDTH // 2 - 30, BACKGROUND_HEIGHT/2-50, player_car)
+
                 all_sprites.add(player)
                 # Reset health
                 health = 100
